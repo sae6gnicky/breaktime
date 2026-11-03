@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우리 반 클래스 보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #d1e0d3; 
+            height: 100vh;
+            overflow: hidden;
+            color: #1a2c20;
+        }
+        .glass-card {
+            background: rgba(250, 255, 250, 0.95);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 확인 명단 버튼 커스텀 */
+        .student-btn { 
+            transition: all 0.2s; 
+            border: 4px solid #57a152; /* 요청하신 색상으로 변경 */
+            background-color: #f0fdf4;
+            font-weight: 900;
+        }
+        .student-btn:hover {
+            background-color: #dcfce7;
+            transform: translateY(-2px);
+        }
+        .student-btn.completed {
+            opacity: 0.15;
+            text-decoration: line-through;
+            pointer-events: none;
+            border-color: #d1d5db;
+        }
+
+        .timer-red {
+            color: #e53e3e;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* 원고지 팝업 레이아웃 */
+        .wongoji-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .wongoji-container {
+            display: grid;
+            grid-template-columns: repeat(18, 1fr);
+            grid-auto-rows: calc((100vw - 40px) / 22); 
+            gap: 0;
+            border: 3px solid #1b4332;
+            background-color: white;
+            width: 98%; 
+            max-width: 1600px;
+        }
+
+        .wongoji-cell {
+            border: 1px solid #b7e4c7;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: calc((100vw - 40px) / 22 * 0.75); 
+            font-weight: 900;
+            color: #1b4332;
+            line-height: 1;
+            aspect-ratio: 1 / 1;
+        }
+
+        @media (min-width: 1400px) {
+            .wongoji-container { 
+                grid-auto-rows: 65px; 
+                width: 1170px; 
+            }
+            .wongoji-cell { font-size: 50px; }
+        }
+
+        .wongoji-cell::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            border-top: 1px dotted #d8f3dc;
+        }
+        .wongoji-cell::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            height: 100%;
+            border-left: 1px dotted #d8f3dc;
+        }
+    </style>
+</head>
+<body class="p-4 flex flex-col gap-4">
+
+    <!-- 대시보드 날짜 헤더 -->
+    <header class="glass-card p-4 text-center">
+        <h1 id="current-date" class="text-5xl font-black text-green-900">2026년 03월 19일 (목)</h1>
+    </header>
+
+    <main class="flex-1 flex gap-4 overflow-hidden">
+        <!-- 왼쪽: 알림장 및 명단 -->
+        <section class="w-1/2 flex flex-col gap-4">
+            <div class="glass-card flex-1 flex flex-col p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-xl font-bold border-l-4 border-green-600 pl-2 text-green-800">📝 알림장</h2>
+                        <button onclick="openWongoji()" class="bg-green-700 hover:bg-green-800 text-white text-xs px-4 py-2 rounded-full font-bold shadow-md active:scale-95 transition-all">
+                            [원고지 크게 보기]
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm">글자 크기:</span>
+                        <input type="range" id="font-size-slider" min="16" max="60" value="30" class="w-32">
+                        <span id="font-size-val" class="text-sm font-bold w-8">30</span>
+                    </div>
+                </div>
+                <textarea id="notice-board" class="w-full flex-1 p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 font-bold resize-none bg-green-50/20 text-3xl" placeholder="여기에 알림장을 작성하세요..."></textarea>
+            </div>
+
+            <div class="glass-card h-64 p-4 flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-xl font-bold border-l-4 border-green-500 pl-2 text-green-800">✅ 확인 명단</h2>
+                    <div class="flex gap-2">
+                        <button onclick="resetStudents()" class="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded">초기화</button>
+                        <button onclick="toggleEditStudents()" id="edit-btn" class="text-xs bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded">명단 수정</button>
+                    </div>
+                </div>
+                <div id="student-container" class="grid grid-cols-6 gap-3 overflow-y-auto pr-1"></div>
+                <div id="student-edit-area" class="hidden">
+                    <textarea id="student-names-input" class="w-full h-32 text-sm p-2 border rounded mb-2"></textarea>
+                    <button onclick="saveStudentList()" class="w-full bg-green-700 text-white py-1 rounded">저장하기</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 오른쪽: 수업 정보 및 타이머 -->
+        <section class="w-1/2 flex flex-col gap-4">
+            <div class="flex gap-2">
+                <button onclick="switchTab('setup')" id="tab-setup" class="flex-1 py-3 font-bold rounded-t-lg bg-white border-b-4 border-green-600 text-green-800">⚙️ 수업 설정</button>
+                <button onclick="switchTab('display')" id="tab-display" class="flex-1 py-3 font-bold rounded-t-lg bg-gray-200 text-gray-600">⏰ 쉬는 시간 / 수업 정보</button>
+            </div>
+            <div class="glass-card flex-1 p-6 overflow-y-auto">
+                <div id="content-setup" class="space-y-4">
+                    <h3 class="text-lg font-bold text-green-900">오늘의 수업 정보 입력</h3>
+                    <div><label class="block text-sm font-medium text-gray-700">다음 수업 과목</label><input type="text" id="input-subject" class="w-full p-2 border rounded"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">교과서 쪽수</label><input type="text" id="input-pages" class="w-full p-2 border rounded"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">준비물</label><input type="text" id="input-supplies" class="w-full p-2 border rounded"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">안내 사항</label><textarea id="input-memo" class="w-full p-2 border rounded h-24"></textarea></div>
+                    <button onclick="saveClassInfo()" class="w-full bg-green-700 text-white py-3 rounded-lg font-bold hover:bg-green-800 shadow-md">정보 저장 및 적용</button>
+                </div>
+                <div id="content-display" class="hidden h-full flex flex-col justify-center items-center text-center">
+                    <div id="timer-container" class="mb-8">
+                        <p id="period-status" class="text-2xl font-bold text-gray-500 mb-2">상태 확인 중...</p>
+                        <h2 id="time-left" class="text-9xl font-black text-green-900">00:00</h2>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 w-full">
+                        <div class="bg-teal-50 p-4 rounded-xl border-2 border-teal-200"><p class="text-gray-500 text-sm font-bold">다음 과목</p><p id="display-subject" class="text-3xl font-bold text-teal-800">-</p></div>
+                        <div class="bg-green-50 p-4 rounded-xl border-2 border-green-200"><p class="text-gray-500 text-sm font-bold">교과서 쪽수</p><p id="display-pages" class="text-3xl font-bold text-green-800">-</p></div>
+                        <div class="bg-yellow-50 p-4 rounded-xl border-2 border-yellow-200 col-span-2"><p class="text-gray-500 text-sm font-bold">준비물</p><p id="display-supplies" class="text-2xl font-bold text-yellow-900">-</p></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 원고지 팝업 모달 -->
+    <div id="wongoji-modal" class="hidden fixed inset-0 bg-black/95 flex items-center justify-center z-50">
+        <div class="bg-[#fdfcf0] w-full h-full flex flex-col overflow-hidden shadow-2xl border-x-[12px] border-green-950">
+            <!-- 헤더 바 -->
+            <div class="p-1 flex justify-between items-center bg-green-950 text-white shrink-0">
+                <span class="ml-4 text-sm font-bold opacity-80">원고지 알림장 모드</span>
+                <button onclick="closeWongoji()" class="text-5xl leading-none px-4 pb-2 font-light hover:text-red-400 transition-colors">&times;</button>
+            </div>
+            
+            <!-- 상단 제목 영역: 날짜 크기를 본문 글자 크기와 조화롭게 조정 -->
+            <div class="px-6 pt-10 pb-4 shrink-0 bg-[#fdfcf0]">
+                <div class="w-full px-4 border-b-4 border-green-900 pb-4">
+                    <!-- text-7xl에서 text-5xl로 줄여 본문 글씨와 비슷한 느낌으로 조정 -->
+                    <p id="wongoji-date-display" class="text-5xl font-black text-green-950 tracking-tight"></p>
+                </div>
+            </div>
+
+            <!-- 원고지 본체 -->
+            <div class="wongoji-scroll-area bg-[#fdfcf0]">
+                <div id="wongoji-grid" class="wongoji-container my-4"></div>
+                
+                <!-- 하단 학생 확인 버튼 영역 (팝업용) -->
+                <div class="w-full max-w-[1600px] mt-2 mb-10 shrink-0 px-4">
+                    <div class="flex justify-center items-center mb-4 border-b-2 border-green-900/10 pb-2">
+                        <span class="text-green-900 font-bold text-lg">✅ 다 읽은 사람 (클릭 시 사라짐)</span>
+                    </div>
+                    <div id="wongoji-student-container" class="flex flex-wrap gap-2 justify-center"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultStudents = ["강리우", "강민준", "권하윤", "김건률", "김로빈", "김재현", "김주현", "김하린", "남기태", "박지안", "손예솔", "신수아", "안도은", "이서준", "임제인", "조시은", "홍은지", "황준우"];
+        let students = [];
+        let completedStudents = [];
+
+        const schedule = [
+            { id: 1, start: "09:00", end: "09:40", label: "1교시" },
+            { id: 'b1', start: "09:40", end: "09:50", label: "쉬는 시간" },
+            { id: 2, start: "09:50", end: "10:30", label: "2교시" },
+            { id: 'b2', start: "10:30", end: "10:40", label: "쉬는 시간" },
+            { id: 3, start: "10:40", end: "11:20", label: "3교시" },
+            { id: 'lunch', start: "11:20", end: "12:00", label: "점심 시간" },
+            { id: 4, start: "12:00", end: "12:40", label: "4교시" },
+            { id: 'b4', start: "12:40", end: "12:50", label: "쉬는 시간" },
+            { id: 5, start: "12:50", end: "13:30", label: "5교시" }
+        ];
+
+        window.onload = function() {
+            loadAllData();
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            setInterval(updateTimer, 1000);
+            renderStudents();
+            renderPopupStudents();
+        };
+
+        function loadAllData() {
+            const savedNotice = localStorage.getItem('notice');
+            if (savedNotice) document.getElementById('notice-board').value = savedNotice;
+            const savedSize = localStorage.getItem('fontSize');
+            if (savedSize) {
+                document.getElementById('notice-board').style.fontSize = savedSize + 'px';
+                document.getElementById('font-size-slider').value = savedSize;
+                document.getElementById('font-size-val').innerText = savedSize;
+            }
+            const savedStudents = localStorage.getItem('students');
+            students = savedStudents ? JSON.parse(savedStudents) : defaultStudents;
+            const savedCompleted = localStorage.getItem('completedStudents');
+            completedStudents = savedCompleted ? JSON.parse(savedCompleted) : [];
+            const savedInfo = localStorage.getItem('classInfo');
+            if (savedInfo) {
+                const info = JSON.parse(savedInfo);
+                document.getElementById('input-subject').value = info.subject || '';
+                document.getElementById('input-pages').value = info.pages || '';
+                document.getElementById('input-supplies').value = info.supplies || '';
+                document.getElementById('input-memo').value = info.memo || '';
+                updateDisplayInfo(info);
+            }
+        }
+
+        function updateDateTime() {
+            const now = new Date();
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+            const dateStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
+            document.getElementById('current-date').innerText = dateStr;
+            return dateStr;
+        }
+
+        function openWongoji() {
+            const modal = document.getElementById('wongoji-modal');
+            const grid = document.getElementById('wongoji-grid');
+            const dateDisplay = document.getElementById('wongoji-date-display');
+            const noticeText = document.getElementById('notice-board').value;
+            const dateStr = updateDateTime();
+            
+            grid.innerHTML = '';
+            dateDisplay.innerText = dateStr;
+            modal.classList.remove('hidden');
+
+            const cols = 18;
+            let cells = [];
+
+            const lines = noticeText.split('\n');
+            lines.forEach((line, idx) => {
+                if (line.trim() === '' && idx > 0) return; 
+                for(let char of line) {
+                    cells.push(char);
+                }
+                if (idx < lines.length - 1) {
+                    const remainingInRow = cols - (cells.length % cols);
+                    if (remainingInRow < cols) {
+                        for(let i=0; i<remainingInRow; i++) cells.push('');
+                    }
+                }
+            });
+
+            while (cells.length < 108) cells.push('');
+            while (cells.length % cols !== 0) cells.push('');
+
+            cells.forEach(char => {
+                const cell = document.createElement('div');
+                cell.className = 'wongoji-cell';
+                cell.innerText = char;
+                grid.appendChild(cell);
+            });
+        }
+
+        function closeWongoji() {
+            document.getElementById('wongoji-modal').classList.add('hidden');
+        }
+
+        document.getElementById('font-size-slider').addEventListener('input', (e) => {
+            const size = e.target.value;
+            document.getElementById('notice-board').style.fontSize = size + 'px';
+            document.getElementById('font-size-val').innerText = size;
+            localStorage.setItem('fontSize', size);
+        });
+
+        document.getElementById('notice-board').addEventListener('input', (e) => {
+            localStorage.setItem('notice', e.target.value);
+        });
+
+        function renderStudents() {
+            const container = document.getElementById('student-container');
+            container.innerHTML = '';
+            students.forEach((name) => {
+                const btn = document.createElement('button');
+                btn.className = `student-btn p-3 border-4 rounded-xl text-xl font-black text-green-950 ${completedStudents.includes(name) ? 'completed' : ''}`;
+                btn.innerText = name;
+                btn.onclick = () => toggleStudent(name);
+                container.appendChild(btn);
+            });
+            document.getElementById('student-names-input').value = students.join(', ');
+        }
+
+        function renderPopupStudents() {
+            const container = document.getElementById('wongoji-student-container');
+            if (!container) return;
+            container.innerHTML = '';
+            students.forEach((name) => {
+                // 완료되지 않은 학생만 렌더링하여 클릭 시 사라지는 효과 구현
+                if (!completedStudents.includes(name)) {
+                    const btn = document.createElement('button');
+                    btn.className = 'px-4 py-2 border-2 border-[#57a152] rounded-lg text-base md:text-lg font-black bg-white hover:bg-green-100 text-green-900 shadow-sm transition-all active:scale-95';
+                    btn.innerText = name;
+                    btn.onclick = () => toggleStudent(name);
+                    container.appendChild(btn);
+                }
+            });
+        }
+
+        function toggleStudent(name) {
+            if (completedStudents.includes(name)) {
+                completedStudents = completedStudents.filter(n => n !== name);
+            } else {
+                completedStudents.push(name);
+            }
+            localStorage.setItem('completedStudents', JSON.stringify(completedStudents));
+            renderStudents();
+            renderPopupStudents();
+        }
+
+        function resetStudents() {
+            completedStudents = [];
+            localStorage.setItem('completedStudents', JSON.stringify(completedStudents));
+            renderStudents();
+            renderPopupStudents();
+        }
+
+        function toggleEditStudents() {
+            const container = document.getElementById('student-container');
+            const editArea = document.getElementById('student-edit-area');
+            const btn = document.getElementById('edit-btn');
+            if (editArea.classList.contains('hidden')) {
+                editArea.classList.remove('hidden');
+                container.classList.add('hidden');
+                btn.innerText = '취소';
+            } else {
+                editArea.classList.add('hidden');
+                container.classList.remove('hidden');
+                btn.innerText = '명단 수정';
+            }
+        }
+
+        function saveStudentList() {
+            const input = document.getElementById('student-names-input').value;
+            students = input.split(/[, \n]+/).map(s => s.trim()).filter(s => s !== '');
+            localStorage.setItem('students', JSON.stringify(students));
+            renderStudents();
+            renderPopupStudents();
+            toggleEditStudents();
+        }
+
+        function switchTab(tab) {
+            const setupTab = document.getElementById('tab-setup');
+            const displayTab = document.getElementById('tab-display');
+            const setupContent = document.getElementById('content-setup');
+            const displayContent = document.getElementById('content-display');
+            if (tab === 'setup') {
+                setupTab.className = "flex-1 py-3 font-bold rounded-t-lg bg-white border-b-4 border-green-600 text-green-800";
+                displayTab.className = "flex-1 py-3 font-bold rounded-t-lg bg-gray-200 text-gray-600";
+                setupContent.classList.remove('hidden');
+                displayContent.classList.add('hidden');
+            } else {
+                displayTab.className = "flex-1 py-3 font-bold rounded-t-lg bg-white border-b-4 border-green-600 text-green-800";
+                setupTab.className = "flex-1 py-3 font-bold rounded-t-lg bg-gray-200 text-gray-600";
+                displayContent.classList.remove('hidden');
+                setupContent.classList.add('hidden');
+            }
+        }
+
+        function saveClassInfo() {
+            const info = {
+                subject: document.getElementById('input-subject').value,
+                pages: document.getElementById('input-pages').value,
+                supplies: document.getElementById('input-supplies').value,
+                memo: document.getElementById('input-memo').value
+            };
+            localStorage.setItem('classInfo', JSON.stringify(info));
+            updateDisplayInfo(info);
+            switchTab('display');
+        }
+
+        function updateDisplayInfo(info) {
+            document.getElementById('display-subject').innerText = info.subject || '-';
+            document.getElementById('display-pages').innerText = info.pages || '-';
+            document.getElementById('display-supplies').innerText = info.supplies || '-';
+        }
+
+        function updateTimer() {
+            const now = new Date();
+            const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+            let currentPeriod = null;
+            let nextPeriod = null;
+            for (let i = 0; i < schedule.length; i++) {
+                if (currentTime >= schedule[i].start && currentTime < schedule[i].end) {
+                    currentPeriod = schedule[i];
+                    break;
+                }
+                if (currentTime < schedule[i].start) {
+                    nextPeriod = schedule[i];
+                    break;
+                }
+            }
+            const statusEl = document.getElementById('period-status');
+            const timerEl = document.getElementById('time-left');
+            if (currentPeriod) {
+                statusEl.innerText = `지금은 [${currentPeriod.label}] 입니다.`;
+                const [endH, endM] = currentPeriod.end.split(':').map(Number);
+                const endDate = new Date();
+                endDate.setHours(endH, endM, 0);
+                const diff = endDate - now;
+                const min = Math.floor(diff / 1000 / 60);
+                const sec = Math.floor((diff / 1000) % 60);
+                timerEl.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+                if (min < 2) timerEl.classList.add('timer-red');
+                else timerEl.classList.remove('timer-red');
+            } else if (nextPeriod) {
+                statusEl.innerText = `다음 일과는 [${nextPeriod.label}] 입니다.`;
+                const [startH, startM] = nextPeriod.start.split(':').map(Number);
+                const startDate = new Date();
+                startDate.setHours(startH, startM, 0);
+                const diff = startDate - now;
+                const min = Math.floor(diff / 1000 / 60);
+                const sec = Math.floor((diff / 1000) % 60);
+                timerEl.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+                timerEl.classList.remove('timer-red');
+            } else {
+                statusEl.innerText = "오늘의 일과가 종료되었습니다.";
+                timerEl.innerText = "00:00";
+            }
+        }
+    </script>
+</body>
+</html>
